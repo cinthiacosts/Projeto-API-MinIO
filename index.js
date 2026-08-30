@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const multer = require("multer");
 
@@ -16,16 +18,16 @@ const upload = multer({
 });
 
 const s3 = new S3Client({
-  region: "us-east-1",
-  endpoint: "http://localhost:9000",
+  region: process.env.S3_REGION,
+  endpoint: process.env.S3_ENDPOINT,
   credentials: {
-    accessKeyId: "minioadmin",
-    secretAccessKey: "minioadmin"
+    accessKeyId: process.env.S3_ACCESS_KEY,
+    secretAccessKey: process.env.S3_SECRET_KEY
   },
   forcePathStyle: true
 });
 
-const bucketName = "arquivos";
+const bucketName = process.env.S3_BUCKET;
 
 async function garantirBucket() {
   try {
@@ -101,8 +103,10 @@ async function iniciar() {
   try {
     await garantirBucket();
 
-    app.listen(3000, () => {
-      console.log("API rodando em http://localhost:3000");
+    const PORT = process.env.PORT || 3000;
+
+    app.listen(PORT, () => {
+      console.log(`API rodando em http://localhost:${PORT}`);
     });
   } catch (erro) {
     console.error("Erro ao conectar ao MinIO:", erro.message);
@@ -110,4 +114,3 @@ async function iniciar() {
 }
 
 iniciar();
-
