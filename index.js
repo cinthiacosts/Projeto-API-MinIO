@@ -1,25 +1,48 @@
 const express = require("express");
 const multer = require("multer");
-const Minio = require("minio");
+
+const {
+  S3Client,
+  HeadBucketCommand,
+  CreateBucketCommand,
+  PutObjectCommand,
+  ListObjectsV2Command
+} = require("@aws-sdk/client-s3");
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
 
-const minioClient = new Minio.Client({
-  endPoint: "localhost",
-  port: 9000,
-  useSSL: false,
-  accessKey: "minioadmin",
-  secretKey: "minioadmin"
+const upload = multer({
+  storage: multer.memoryStorage()
+});
+
+const s3 = new S3Client({
+  region: "us-east-1",
+  endpoint: "http://localhost:9000",
+  credentials: {
+    accessKeyId: "minioadmin",
+    secretAccessKey: "minioadmin"
+  },
+  forcePathStyle: true
 });
 
 const bucketName = "arquivos";
 
 async function garantirBucket() {
-  const existe = await minioClient.bucketExists(bucketName);
+  try {
+    await s3.send(
+      new HeadBucketCommand({
+        Bucket: bucketName
+      })
+    );
 
-  if (!existe) {
-    await minioClient.makeBucket(bucketName);
+    console.log("Bucket já existe:", bucketName);
+  } catch (erro) {
+    await s3.send(
+      new CreateBucketCommand({
+        Bucket: bucketName
+      })
+    );
+
     console.log("Bucket criado:", bucketName);
   }
 }
@@ -32,11 +55,13 @@ app.post("/upload", upload.single("arquivo"), async (req, res) => {
       });
     }
 
-    await minioClient.putObject(
-      bucketName,
-      req.file.originalname,
-      req.file.buffer,
-      req.file.size
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: req.file.originalname,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+      })
     );
 
     res.status(201).json({
@@ -52,26 +77,19 @@ app.post("/upload", upload.single("arquivo"), async (req, res) => {
 
 app.get("/arquivos", async (req, res) => {
   try {
-    const arquivos = [];
-    const stream = minioClient.listObjects(bucketName, "", true);
+    const resposta = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucketName
+      })
+    );
 
-    stream.on("data", (objeto) => {
-      arquivos.push({
-        nome: objeto.name,
-        tamanho: objeto.size,
-        ultimaModificacao: objeto.lastModified
-      });
-    });
+    const arquivos = (resposta.Contents || []).map((objeto) => ({
+      nome: objeto.Key,
+      tamanho: objeto.Size,
+      ultimaModificacao: objeto.LastModified
+    }));
 
-    stream.on("end", () => {
-      res.json(arquivos);
-    });
-
-    stream.on("error", (erro) => {
-      res.status(500).json({
-        erro: erro.message
-      });
-    });
+    res.json(arquivos);
   } catch (erro) {
     res.status(500).json({
       erro: erro.message
@@ -92,3 +110,4 @@ async function iniciar() {
 }
 
 iniciar();
+
