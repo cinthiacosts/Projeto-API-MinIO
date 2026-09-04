@@ -1,0 +1,18 @@
+### Upload de arquivo
+POST http://localhost:3000/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="arquivo"; filename="teste-correto.txt"
+Content-Type: text/plain
+
+< ./teste-correto.txt
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Listar arquivos
+GET http://localhost:3000/files
+
+
+### Baixar arquivo
+GET http://localhost:3000/files/teste-correto.txt
