@@ -8,7 +8,8 @@ const {
   HeadBucketCommand,
   CreateBucketCommand,
   PutObjectCommand,
-  ListObjectsV2Command
+  ListObjectsV2Command,
+  HeadObjectCommand
 } = require("@aws-sdk/client-s3");
 
 const app = express();
@@ -77,7 +78,7 @@ app.post("/upload", upload.single("arquivo"), async (req, res) => {
   }
 });
 
-app.get("/arquivos", async (req, res) => {
+app.get("/files", async (req, res) => {
   try {
     const resposta = await s3.send(
       new ListObjectsV2Command({
@@ -85,11 +86,23 @@ app.get("/arquivos", async (req, res) => {
       })
     );
 
-    const arquivos = (resposta.Contents || []).map((objeto) => ({
-      nome: objeto.Key,
-      tamanho: objeto.Size,
-      ultimaModificacao: objeto.LastModified
-    }));
+    const arquivos = await Promise.all(
+      (resposta.Contents || []).map(async (objeto) => {
+        const metadados = await s3.send(
+          new HeadObjectCommand({
+            Bucket: bucketName,
+            Key: objeto.Key
+          })
+        );
+
+        return {
+          nome: objeto.Key,
+          tamanho: objeto.Size,
+          data: objeto.LastModified,
+          contentType: metadados.ContentType || "application/octet-stream"
+        };
+      })
+    );
 
     res.json(arquivos);
   } catch (erro) {
