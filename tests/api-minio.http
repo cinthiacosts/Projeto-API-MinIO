@@ -16,3 +16,14 @@ GET http://localhost:3000/files
 
 ### Baixar arquivo
 GET http://localhost:3000/files/teste-correto.txt
+
+
+### Teste de validação - upload sem arquivo
+POST http://localhost:3000/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Teste de validação - arquivo inexistente
+GET http://localhost:3000/files/arquivo-inexistente.txt
