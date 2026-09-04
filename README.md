@@ -26,7 +26,8 @@ A aplicação permite:
 - enviar arquivos para um bucket;
 - listar os arquivos armazenados e seus metadados;
 - recuperar e realizar o download dos arquivos;
-- manter os objetos persistidos através de volume Docker.
+- manter os objetos persistidos através de volume Docker;
+- validar uploads e tratar situações de erro.
 
 ---
 
@@ -111,7 +112,7 @@ Responsável pela configuração da conexão S3/MinIO e pela verificação e cri
 Contém a lógica de upload, listagem e recuperação dos arquivos.
 
 **`src/routes/fileRoutes.js`**  
-Define as rotas HTTP disponibilizadas pela API.
+Define as rotas HTTP disponibilizadas pela API e as validações relacionadas ao upload.
 
 **`index.js`**  
 Inicializa a aplicação Express e realiza a conexão com os módulos da aplicação.
@@ -244,6 +245,20 @@ Exemplo de resposta:
 }
 ```
 
+A API possui limite máximo de **10 MB por arquivo**.
+
+Quando nenhum arquivo é enviado, a API retorna:
+
+```text
+400 Bad Request
+```
+
+Quando o arquivo ultrapassa o limite de 10 MB, a API retorna:
+
+```text
+413 Payload Too Large
+```
+
 ### GET /files
 
 Lista os arquivos armazenados no bucket e seus metadados.
@@ -256,7 +271,7 @@ Lista os arquivos armazenados no bucket e seus metadados.
 http://localhost:3000/files
 ```
 
-Exemplo de resposta obtida durante o teste:
+Exemplo de resposta obtida durante os testes:
 
 ```json
 [
@@ -290,6 +305,12 @@ http://localhost:3000/files/teste-correto.txt
 
 A resposta utiliza o `Content-Type` armazenado e disponibiliza o objeto para download.
 
+Caso o arquivo solicitado não exista, a API retorna:
+
+```text
+404 Not Found
+```
+
 ---
 
 ## Testes
@@ -306,17 +327,23 @@ Foram validados os seguintes cenários:
 
 1. envio de arquivo através de `POST /upload`;
 2. listagem dos objetos e metadados através de `GET /files`;
-3. recuperação do objeto através de `GET /files/:filename`.
+3. recuperação do objeto através de `GET /files/:filename`;
+4. tentativa de upload sem arquivo;
+5. tentativa de recuperação de arquivo inexistente;
+6. tentativa de upload de arquivo acima do limite permitido.
 
-Nos testes realizados com o arquivo `teste-correto.txt`, foram obtidas as seguintes respostas:
+### Resultados obtidos
 
-```text
-POST /upload                  -> HTTP 201 Created
-GET /files                    -> HTTP 200 OK
-GET /files/teste-correto.txt  -> HTTP 200 OK
-```
+| Teste | Resultado |
+|---|---|
+| `POST /upload` | `201 Created` |
+| `GET /files` | `200 OK` |
+| `GET /files/teste-correto.txt` | `200 OK` |
+| Upload sem arquivo | `400 Bad Request` |
+| Arquivo inexistente | `404 Not Found` |
+| Upload acima de 10 MB | `413 Payload Too Large` |
 
-Na listagem, o arquivo utilizado no teste apresentou:
+Nos testes normais foi utilizado o arquivo:
 
 ```text
 Nome: teste-correto.txt
@@ -330,6 +357,57 @@ A recuperação retornou corretamente o conteúdo armazenado:
 Teste final da API MinIO
 ```
 
+### Validação do limite de upload
+
+A API possui limite máximo de 10 MB por upload.
+
+Para validar esse comportamento, foi utilizado temporariamente um arquivo de 11 MB. O envio foi recusado corretamente com:
+
+```text
+413 Payload Too Large
+```
+
+Mensagem retornada:
+
+```text
+Arquivo excede o limite máximo de 10 MB
+```
+
+O arquivo de 11 MB foi utilizado apenas para validação e não faz parte do repositório.
+
+### Validações de erro
+
+Também foram testadas situações de erro.
+
+Upload sem arquivo:
+
+```text
+400 Bad Request
+Nenhum arquivo foi enviado
+```
+
+Solicitação de arquivo inexistente:
+
+```text
+404 Not Found
+Arquivo não encontrado
+```
+
+### Tempos observados
+
+Durante as execuções locais foram observados diferentes tempos de resposta. Entre as medições realizadas:
+
+| Operação | Tempos observados |
+|---|---|
+| Upload normal | 109 ms e 24 ms |
+| Listagem de arquivos | 46 ms e 14 ms |
+| Download | 19 ms e 11 ms |
+| Upload sem arquivo | 5 ms |
+| Arquivo inexistente | 34 ms |
+| Bloqueio do arquivo de 11 MB | 55 ms |
+
+Os valores representam medições realizadas no ambiente local durante os testes e podem variar entre diferentes execuções.
+
 ---
 
 ## Persistência
@@ -341,6 +419,8 @@ minio_data
 ```
 
 Dessa forma, os objetos armazenados permanecem disponíveis após parar e iniciar novamente o container.
+
+A persistência foi verificada durante os testes do projeto.
 
 ---
 
@@ -391,6 +471,8 @@ O artigo técnico e os demais documentos do trabalho serão disponibilizados na 
 docs/
 ```
 
+A pasta `tests/` contém a coleção REST Client e a documentação específica dos testes realizados.
+
 ---
 
 ## Status
@@ -401,11 +483,15 @@ As funcionalidades principais da API foram implementadas e validadas:
 - [x] persistência por volume;
 - [x] criação automática do bucket;
 - [x] upload de arquivos;
+- [x] limite máximo de 10 MB por upload;
 - [x] listagem de arquivos e metadados;
 - [x] recuperação/download;
+- [x] validação de upload sem arquivo;
+- [x] tratamento de arquivo inexistente;
+- [x] tratamento de arquivo acima do limite;
 - [x] estrutura modular;
 - [x] variáveis de ambiente;
 - [x] coleção de testes REST Client;
+- [x] documentação dos testes e métricas;
 - [ ] artigo técnico final em PDF;
-- [ ] documentação das evidências e métricas;
 - [ ] apresentação técnica.
