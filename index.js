@@ -9,7 +9,8 @@ const {
   CreateBucketCommand,
   PutObjectCommand,
   ListObjectsV2Command,
-  HeadObjectCommand
+  HeadObjectCommand,
+  GetObjectCommand
 } = require("@aws-sdk/client-s3");
 
 const app = express();
@@ -50,6 +51,7 @@ async function garantirBucket() {
   }
 }
 
+// Cinthia - envio de arquivos
 app.post("/upload", upload.single("arquivo"), async (req, res) => {
   try {
     if (!req.file) {
@@ -78,6 +80,7 @@ app.post("/upload", upload.single("arquivo"), async (req, res) => {
   }
 });
 
+// Parte atribuída ao Alex - listagem de arquivos
 app.get("/files", async (req, res) => {
   try {
     const resposta = await s3.send(
@@ -108,6 +111,44 @@ app.get("/files", async (req, res) => {
   } catch (erro) {
     res.status(500).json({
       erro: erro.message
+    });
+  }
+});
+
+// Parte atribuída ao Ricardo - recuperação/download de arquivo
+app.get("/files/:filename", async (req, res) => {
+  try {
+    const filename = req.params.filename;
+
+    const resposta = await s3.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: filename
+      })
+    );
+
+    res.setHeader(
+      "Content-Type",
+      resposta.ContentType || "application/octet-stream"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`
+    );
+
+    resposta.Body.pipe(res);
+  } catch (erro) {
+    const status =
+      erro.$metadata?.httpStatusCode === 404 || erro.name === "NoSuchKey"
+        ? 404
+        : 500;
+
+    res.status(status).json({
+      erro:
+        status === 404
+          ? "Arquivo não encontrado"
+          : erro.message
     });
   }
 });
